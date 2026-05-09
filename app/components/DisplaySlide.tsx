@@ -15,6 +15,7 @@ interface Props {
     activeEntry?: BundleSlideEntry | null;
     announcement?: string | null;
     onReady?: () => void;
+    hideBackground?: boolean;
 }
 
 const DEFAULT_W = 1920;
@@ -25,7 +26,7 @@ function isVideo(name: string) {
     return VIDEO_EXTS.has(name.split(".").pop()?.toLowerCase() ?? "");
 }
 
-export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOverride, showMissingAssetWarning = false, activeEntry, announcement, onReady }: Props) {
+export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOverride, showMissingAssetWarning = false, activeEntry, announcement, onReady, hideBackground = false }: Props) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasWrapRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -156,11 +157,33 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
         return () => clearInterval(interval);
     }, [bundleMeta?.showLocalTime]);
 
+    const canvasReadyRef = useRef(false);
+    const videoReadyRef = useRef(false);
+    const readyFiredRef = useRef(false);
+
+    const fileUrl = backgroundFile
+        ? `/api/files/backgrounds/${encodeURIComponent(backgroundFile)}`
+        : null;
+    const fileIsVideo = backgroundFile ? isVideo(backgroundFile) : false;
+
+    const checkReady = useCallback(() => {
+        if (readyFiredRef.current) return;
+        const needsVideo = fileUrl && fileIsVideo;
+        if (canvasReadyRef.current && (!needsVideo || videoReadyRef.current)) {
+            readyFiredRef.current = true;
+            onReady?.();
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [fileUrl, fileIsVideo]);
+
     // Load JSON whenever it changes
     useEffect(() => {
         const c = fabricRef.current;
         if (!c) return;
         const seq = ++loadSeqRef.current;
+        canvasReadyRef.current = false;
+        videoReadyRef.current = false;
+        readyFiredRef.current = false;
         if (!json) {
             try {
                 c.clear();
@@ -169,7 +192,8 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
                 // Ignore dispose races.
             }
             queueMicrotask(() => setHasMissingAssets(false));
-            onReady?.();
+            canvasReadyRef.current = true;
+            checkReady();
             return;
         }
         loadFabricJsonSafely(c, json)
@@ -181,20 +205,17 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
                 } catch {
                     // Ignore dispose races.
                 }
-                onReady?.();
+                canvasReadyRef.current = true;
+                checkReady();
             });
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [json]);
-    const fileUrl = backgroundFile
-        ? `/api/files/backgrounds/${encodeURIComponent(backgroundFile)}`
-        : null;
-    const fileIsVideo = backgroundFile ? isVideo(backgroundFile) : false;
 
     return (
         <div
             ref={containerRef}
             className="slide-preview-container"
-            style={!fileUrl && background ? { background } : undefined}
+            style={!hideBackground && !fileUrl && background ? { background } : undefined}
         >
             {(() => {
                 const showClock = bundleMeta?.showLocalTime;
@@ -267,7 +288,7 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
                 );
             })()}
             <div ref={canvasWrapRef} className="ds-canvas-wrap" style={{ position: "relative" }}>
-                {fileUrl && fileIsVideo && (
+                {!hideBackground && fileUrl && fileIsVideo && (
                     <video
                         key={fileUrl}
                         src={fileUrl}
@@ -276,9 +297,13 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
                         muted
                         playsInline
                         className="ds-bg-media"
+                        onCanPlay={() => {
+                            videoReadyRef.current = true;
+                            checkReady();
+                        }}
                     />
                 )}
-                {fileUrl && !fileIsVideo && (
+                {!hideBackground && fileUrl && !fileIsVideo && (
                     <Image src={fileUrl} className="ds-bg-media" alt="" fill />
                 )}
                 {activeEntry?.type === "website" && (

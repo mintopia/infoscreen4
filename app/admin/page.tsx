@@ -127,6 +127,7 @@ export default function AdminDashboard() {
     const [announcementDraft, setAnnouncementDraft] = useState("");
     const announcementSeeded = useRef(false);
     const bundleMetaRef = useRef<BundleMeta>({});
+    const lastNavSlideRef = useRef<string | null>(null);
     const liveLoadSeqRef = useRef(0);
 
     useEffect(() => {
@@ -155,6 +156,7 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         announcementSeeded.current = false;
+        lastNavSlideRef.current = null;
     }, [effectiveSelectedDisplay]);
 
     const selectedDisplayState = useMemo(
@@ -519,10 +521,33 @@ export default function AdminDashboard() {
     };
 
     const navigate = (dir: 1 | -1) => {
-        if (!slides.length) return;
-        const cur = selectedSlide ? slides.indexOf(selectedSlide) : -1;
-        const next = (cur + dir + slides.length) % slides.length;
-        setSelectedSlide(slides[next]);
+        if (!effectiveSelectedDisplay || !selectedDisplayState) {
+            if (!slides.length) return;
+            const cur = selectedSlide ? slides.indexOf(selectedSlide) : -1;
+            const next = (cur + dir + slides.length) % slides.length;
+            setSelectedSlide(slides[next]);
+            return;
+        }
+
+        const displayBundle = selectedDisplayState.bundle;
+        const displaySlides = bundles.find((b) => b.name === displayBundle)?.slides ?? [];
+        if (!displaySlides.length) return;
+
+        const currentSlide = lastNavSlideRef.current
+            && displaySlides.includes(lastNavSlideRef.current)
+            ? lastNavSlideRef.current
+            : selectedDisplayState.slide;
+        const curIdx = displaySlides.indexOf(currentSlide);
+        const nextIdx = (curIdx + dir + displaySlides.length) % displaySlides.length;
+        const nextSlide = displaySlides[nextIdx];
+        lastNavSlideRef.current = nextSlide;
+
+        if (selectedBundle === displayBundle) {
+            setSelectedSlide(nextSlide);
+        }
+
+        const duration = bundleMetaRef.current.defaultDuration ?? DEFAULT_DURATION;
+        showSlide(effectiveSelectedDisplay, { bundle: displayBundle, slide: nextSlide, duration });
     };
 
     const isActive = (bundle: string, slide: string) =>

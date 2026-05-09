@@ -2,10 +2,16 @@
 
 import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
+import Image from "next/image";
 import { useSocket } from "../hooks/useSocket";
 import { BundleMeta, BundleSlideEntry } from "../interfaces/BundleMeta";
 
 const DisplaySlide = dynamic(() => import("./DisplaySlide"), { ssr: false });
+
+const VIDEO_EXTS = new Set(["mp4", "webm", "ogg"]);
+function isVideo(name: string) {
+    return VIDEO_EXTS.has(name.split(".").pop()?.toLowerCase() ?? "");
+}
 
 const PC_CONFIG: RTCConfiguration = {
     iceServers: [{ urls: "stun:stun.l.google.com:19302" }],
@@ -238,13 +244,31 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
     }, [connected, socketRef]);
 
     const transitionDuration = bundleMeta.transitionDuration ?? 0.5;
+    const bgFile = bundleMeta.backgroundFile;
+    const bgFileUrl = bgFile ? `/api/files/backgrounds/${encodeURIComponent(bgFile)}` : null;
+    const bgIsVideo = bgFile ? isVideo(bgFile) : false;
+    const hasLayers = !!(currentLayer || prevLayer);
 
     return (
-        <div className="display-root">
+        <div className="display-root" style={!bgFileUrl && bundleMeta.backgroundColor ? { background: bundleMeta.backgroundColor } : undefined}>
             {!state.activeSlide && !activeStream && (
                 <div className="display-standby">
                     <span className="display-standby-text">Standby</span>
                 </div>
+            )}
+            {hasLayers && bgFileUrl && bgIsVideo && (
+                <video
+                    key={bgFileUrl}
+                    src={bgFileUrl}
+                    autoPlay
+                    loop
+                    muted
+                    playsInline
+                    style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover", zIndex: 0 }}
+                />
+            )}
+            {hasLayers && bgFileUrl && !bgIsVideo && (
+                <Image src={bgFileUrl} alt="" fill style={{ objectFit: "cover", zIndex: 0 }} />
             )}
             {prevLayer && (
                 <div className="ds-transition-layer" style={{ zIndex: 1 }}>
@@ -254,6 +278,7 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                         bundleMeta={prevLayer.bundleMeta}
                         activeEntry={prevLayer.activeEntry}
                         announcement={announcement}
+                        hideBackground
                     />
                 </div>
             )}
@@ -274,6 +299,7 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                         activeEntry={currentLayer.activeEntry}
                         announcement={announcement}
                         onReady={handleLayerReady}
+                        hideBackground={hasLayers}
                     />
                 </div>
             )}
