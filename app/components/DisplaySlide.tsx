@@ -207,10 +207,12 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
                 )}
                 {activeEntry?.type === "website" && (
                     <iframe
+                        key={activeEntry.data}
                         src={activeEntry.data}
-                        className="ds-iframe"
-                        style={{ width: "100%", height: "100%", border: "none", position: "absolute", inset: 0, zIndex: 1, backgroundColor: "white" }}
+                        className="ds-iframe ds-iframe-loading"
+                        style={{ width: "100%", height: "100%", border: "none", position: "absolute", inset: 0, zIndex: 1, backgroundColor: "transparent" }}
                         allow="autoplay; fullscreen"
+                        onLoad={(e) => e.currentTarget.classList.remove("ds-iframe-loading")}
                     />
                 )}
                 <canvas ref={canvasRef} className="ds-canvas" style={activeEntry?.type === "website" ? { display: "none" } : undefined} />
