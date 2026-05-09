@@ -88,6 +88,36 @@ export default function BundleSettingsPanel({ selectedBundle, bundleMeta, metaDr
                         </div>
                     </div>
 
+                    <div className="admin-settings-group" style={{ marginTop: 8 }}>
+                        <label className="admin-settings-label">Slide transition</label>
+                        <div className="admin-settings-row">
+                            <select
+                                className="admin-settings-input"
+                                value={metaDraft.transition ?? "cut"}
+                                onChange={(e) => setMetaDraft((d) => ({ ...d, transition: e.target.value as any }))}
+                                style={{ width: 120 }}
+                            >
+                                <option value="cut">Cut</option>
+                                <option value="dissolve">Dissolve</option>
+                            </select>
+                            {(metaDraft.transition === "dissolve") && (
+                                <>
+                                    <input
+                                        type="number"
+                                        min={0.1}
+                                        max={5}
+                                        step={0.1}
+                                        className="admin-settings-input"
+                                        style={{ width: 70 }}
+                                        value={metaDraft.transitionDuration ?? 0.5}
+                                        onChange={(e) => setMetaDraft((d) => ({ ...d, transitionDuration: Number(e.target.value) || undefined }))}
+                                    />
+                                    <span className="admin-label">s</span>
+                                </>
+                            )}
+                        </div>
+                    </div>
+
                         <div className="admin-settings-group" style={{ marginTop: 8 }}>
                             <label className="admin-settings-label">Local Time Display</label>
                             <div className="admin-settings-row">

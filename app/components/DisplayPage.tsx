@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import dynamic from "next/dynamic";
 import { useSocket } from "../hooks/useSocket";
-import { BundleMeta } from "../interfaces/BundleMeta";
+import { BundleMeta, BundleSlideEntry } from "../interfaces/BundleMeta";
 
 const DisplaySlide = dynamic(() => import("./DisplaySlide"), { ssr: false });
 
@@ -17,6 +17,13 @@ interface ActiveStream {
     streamSocketId: string;
 }
 
+interface SlideLayer {
+    key: number;
+    json: object | null;
+    bundleMeta: BundleMeta;
+    activeEntry: BundleSlideEntry | null;
+}
+
 interface DisplayPageProps {
     displayId?: string;
 }
@@ -27,6 +34,17 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
     const [displayJson, setDisplayJson] = useState<object | null>(null);
     const [bundleMeta, setBundleMeta] = useState<BundleMeta>({});
     const loadSeqRef = useRef(0);
+    const layerKeyRef = useRef(0);
+
+    const [currentLayer, setCurrentLayer] = useState<SlideLayer | null>(null);
+    const [prevLayer, setPrevLayer] = useState<SlideLayer | null>(null);
+    const [transitioning, setTransitioning] = useState(false);
+    const currentLayerRef = useRef<SlideLayer | null>(null);
+    const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    useEffect(() => {
+        currentLayerRef.current = currentLayer;
+    }, [currentLayer]);
 
     // WebRTC stream state
     const [activeStream, setActiveStream] = useState<ActiveStream | null>(null);
@@ -38,6 +56,38 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
         activeStreamRef.current = activeStream;
     }, [activeStream]);
 
+    const commitLayer = useCallback((json: object | null, meta: BundleMeta, slideId: string | undefined) => {
+        const entry = meta.slides?.find(s => s.id === slideId) ?? null;
+        const newLayer: SlideLayer = {
+            key: ++layerKeyRef.current,
+            json,
+            bundleMeta: meta,
+            activeEntry: entry,
+        };
+
+        const transition = meta.transition ?? "cut";
+        const duration = meta.transitionDuration ?? 0.5;
+
+        if (transitionTimerRef.current) {
+            clearTimeout(transitionTimerRef.current);
+            transitionTimerRef.current = null;
+        }
+
+        if (transition === "dissolve" && currentLayerRef.current) {
+            setPrevLayer(currentLayerRef.current);
+            setCurrentLayer(newLayer);
+            setTransitioning(true);
+            transitionTimerRef.current = setTimeout(() => {
+                setPrevLayer(null);
+                setTransitioning(false);
+            }, duration * 1000);
+        } else {
+            setPrevLayer(null);
+            setCurrentLayer(newLayer);
+            setTransitioning(false);
+        }
+    }, []);
+
     // Slide loading
     useEffect(() => {
         const active = state.activeSlide;
@@ -45,6 +95,13 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
             defer(() => {
                 setDisplayJson(null);
                 setBundleMeta({});
+                if (transitionTimerRef.current) {
+                    clearTimeout(transitionTimerRef.current);
+                    transitionTimerRef.current = null;
+                }
+                setPrevLayer(null);
+                setCurrentLayer(null);
+                setTransitioning(false);
             });
             return;
         }
@@ -52,9 +109,12 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
         const hasSocketJson = active.json != null;
         const hasSocketMeta = active.bundleMeta != null;
         if (hasSocketJson && hasSocketMeta) {
+            const meta = active.bundleMeta as BundleMeta;
+            const json = active.json as object;
             defer(() => {
-                setBundleMeta(active.bundleMeta as BundleMeta);
-                setDisplayJson(active.json as object);
+                setBundleMeta(meta);
+                setDisplayJson(json);
+                commitLayer(json, meta, active.slide);
             });
             return;
         }
@@ -72,10 +132,12 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                     .then((r) => r.json()).catch(() => null),
         ]).then(([meta, json]) => {
             if (loadSeqRef.current !== seq) return;
-            setBundleMeta((meta ?? {}) as BundleMeta);
+            const m = (meta ?? {}) as BundleMeta;
+            setBundleMeta(m);
             if (json) setDisplayJson(json);
+            commitLayer(json, m, active.slide);
         });
-    }, [state.activeSlide]);
+    }, [state.activeSlide, commitLayer]);
 
     useEffect(() => {
         if (!bundleMetaUpdate) return;
@@ -157,7 +219,9 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
             socket.off("stream:ended", onStreamEnded);
             teardown();
         };
-    }, [connected, socketRef]); // re-run when socket connects/reconnects
+    }, [connected, socketRef]);
+
+    const transitionDuration = bundleMeta.transitionDuration ?? 0.5;
 
     return (
         <div className="display-root">
@@ -166,11 +230,39 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                     <span className="display-standby-text">Standby</span>
                 </div>
             )}
-            <DisplaySlide
-                json={displayJson}
-                bundleMeta={bundleMeta}
-                activeEntry={bundleMeta.slides?.find(s => s.id === state.activeSlide?.slide) ?? null}
-            />
+            {prevLayer && (
+                <div className="ds-transition-layer" style={{ zIndex: 1 }}>
+                    <DisplaySlide
+                        key={prevLayer.key}
+                        json={prevLayer.json}
+                        bundleMeta={prevLayer.bundleMeta}
+                        activeEntry={prevLayer.activeEntry}
+                    />
+                </div>
+            )}
+            {currentLayer && (
+                <div
+                    className={`ds-transition-layer ${transitioning ? "ds-dissolve-in" : ""}`}
+                    style={{
+                        zIndex: 2,
+                        ...(transitioning ? { animationDuration: `${transitionDuration}s` } : {}),
+                    }}
+                >
+                    <DisplaySlide
+                        key={currentLayer.key}
+                        json={currentLayer.json}
+                        bundleMeta={currentLayer.bundleMeta}
+                        activeEntry={currentLayer.activeEntry}
+                    />
+                </div>
+            )}
+            {!currentLayer && (
+                <DisplaySlide
+                    json={displayJson}
+                    bundleMeta={bundleMeta}
+                    activeEntry={bundleMeta.slides?.find(s => s.id === state.activeSlide?.slide) ?? null}
+                />
+            )}
             {activeStream && (
                 <div className="absolute inset-0 z-50 bg-black flex items-center justify-center">
                     <video

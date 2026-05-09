@@ -1494,6 +1494,20 @@ canvas {
     opacity: 0;
 }
 
+.ds-transition-layer {
+    position: absolute;
+    inset: 0;
+}
+
+.ds-dissolve-in {
+    animation: ds-dissolve-keyframes ease-in-out forwards;
+}
+
+@keyframes ds-dissolve-keyframes {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
 .admin-preview-controls {
     padding: 8px 12px;
     display: flex;

@@ -7,6 +7,8 @@ export interface BundleSlideEntry {
     duration?: number;     // optional per-slide override (seconds)
 }
 
+export type TransitionType = 'cut' | 'dissolve';
+
 export interface BundleMeta {
     backgroundColor?: string;
     backgroundFile?: string;  // filename from /api/files/backgrounds/[file] or /api/files/videos/[file] for video backgrounds
@@ -16,5 +18,7 @@ export interface BundleMeta {
     showLocalTime?: boolean;  // show optional local time
     localTimePosition?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
     defaultDuration?: number; // default slide duration in seconds (<=0 = manual)
+    transition?: TransitionType;
+    transitionDuration?: number; // seconds, default 0.5
     slides?: BundleSlideEntry[]; // ordered slide definitions used for cycling/order
 }
