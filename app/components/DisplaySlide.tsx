@@ -14,6 +14,7 @@ interface Props {
     showMissingAssetWarning?: boolean;
     activeEntry?: BundleSlideEntry | null;
     announcement?: string | null;
+    onReady?: () => void;
 }
 
 const DEFAULT_W = 1920;
@@ -24,7 +25,7 @@ function isVideo(name: string) {
     return VIDEO_EXTS.has(name.split(".").pop()?.toLowerCase() ?? "");
 }
 
-export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOverride, showMissingAssetWarning = false, activeEntry, announcement }: Props) {
+export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOverride, showMissingAssetWarning = false, activeEntry, announcement, onReady }: Props) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasWrapRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -168,6 +169,7 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
                 // Ignore dispose races.
             }
             queueMicrotask(() => setHasMissingAssets(false));
+            onReady?.();
             return;
         }
         loadFabricJsonSafely(c, json)
@@ -179,7 +181,9 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
                 } catch {
                     // Ignore dispose races.
                 }
+                onReady?.();
             });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [json]);
     const fileUrl = backgroundFile
         ? `/api/files/backgrounds/${encodeURIComponent(backgroundFile)}`

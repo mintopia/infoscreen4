@@ -44,6 +44,8 @@ export default function Toolbar({ canvas, onZoomIn, onZoomOut, onActualZoom, onR
     const [underline, setUnderline] = useState(false);
     const [fillPresetsOpen, setFillPresetsOpen] = useState(false);
     const [strokePresetsOpen, setStrokePresetsOpen] = useState(false);
+    const [fillHexDraft, setFillHexDraft] = useState<string | null>(null);
+    const [strokeHexDraft, setStrokeHexDraft] = useState<string | null>(null);
 
     // Bundle / slide state
     const [bundles, setBundles] = useState<string[]>([]);
@@ -141,6 +143,8 @@ export default function Toolbar({ canvas, onZoomIn, onZoomOut, onActualZoom, onR
     };
 
     const rgbaToString = ({ r, g, b, a }: RgbaColor) => `rgba(${r},${g},${b},${a})`;
+    const rgbaToHex = ({ r, g, b }: RgbaColor) =>
+        `#${[r, g, b].map(c => c.toString(16).padStart(2, "0")).join("")}`;
     const parseToRgba = (color: string): RgbaColor | null => {
         try {
             const [r, g, b, a] = new fabric.Color(color).getSource();
@@ -566,6 +570,33 @@ export default function Toolbar({ canvas, onZoomIn, onZoomOut, onActualZoom, onR
                     {fillPresetsOpen && (
                         <div className="toolbar-presets-popover">
                             <RgbaColorPicker color={fillColor} onChange={handleColorChange} />
+                            <input
+                                type="text"
+                                className="toolbar-hex-input"
+                                value={fillHexDraft ?? rgbaToHex(fillColor)}
+                                onFocus={() => setFillHexDraft(rgbaToHex(fillColor))}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setFillHexDraft(v);
+                                    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                                        handleColorChange({ ...hexToRgba(v), a: fillColor.a });
+                                    }
+                                }}
+                                onBlur={() => setFillHexDraft(null)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        const v = e.currentTarget.value;
+                                        if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                                            handleColorChange({ ...hexToRgba(v), a: fillColor.a });
+                                        }
+                                        setFillHexDraft(null);
+                                        e.currentTarget.blur();
+                                    }
+                                }}
+                                maxLength={7}
+                                placeholder="#000000"
+                                spellCheck={false}
+                            />
                             <div className="toolbar-color-presets">
                                 {colorPresets.map((color) => (
                                     <button key={color} className="toolbar-color-preset" style={{ "--preset-color": color } as React.CSSProperties} onClick={() => { handleColorChange(hexToRgba(color)); setFillPresetsOpen(false); }} title={color} />
@@ -584,6 +615,33 @@ export default function Toolbar({ canvas, onZoomIn, onZoomOut, onActualZoom, onR
                     {strokePresetsOpen && (
                         <div className="toolbar-presets-popover">
                             <RgbaColorPicker color={strokeColor} onChange={handleStrokeColorChange} />
+                            <input
+                                type="text"
+                                className="toolbar-hex-input"
+                                value={strokeHexDraft ?? rgbaToHex(strokeColor)}
+                                onFocus={() => setStrokeHexDraft(rgbaToHex(strokeColor))}
+                                onChange={(e) => {
+                                    const v = e.target.value;
+                                    setStrokeHexDraft(v);
+                                    if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                                        handleStrokeColorChange({ ...hexToRgba(v), a: strokeColor.a });
+                                    }
+                                }}
+                                onBlur={() => setStrokeHexDraft(null)}
+                                onKeyDown={(e) => {
+                                    if (e.key === "Enter") {
+                                        const v = e.currentTarget.value;
+                                        if (/^#[0-9a-fA-F]{6}$/.test(v)) {
+                                            handleStrokeColorChange({ ...hexToRgba(v), a: strokeColor.a });
+                                        }
+                                        setStrokeHexDraft(null);
+                                        e.currentTarget.blur();
+                                    }
+                                }}
+                                maxLength={7}
+                                placeholder="#000000"
+                                spellCheck={false}
+                            />
                             <div className="toolbar-color-presets">
                                 {colorPresets.map((color) => (
                                     <button key={color} className="toolbar-color-preset" style={{ "--preset-color": color } as React.CSSProperties} onClick={() => { handleStrokeColorChange(hexToRgba(color)); setStrokePresetsOpen(false); }} title={color} />

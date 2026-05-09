@@ -39,8 +39,10 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
     const [currentLayer, setCurrentLayer] = useState<SlideLayer | null>(null);
     const [prevLayer, setPrevLayer] = useState<SlideLayer | null>(null);
     const [transitioning, setTransitioning] = useState(false);
+    const [layerReady, setLayerReady] = useState(false);
     const currentLayerRef = useRef<SlideLayer | null>(null);
     const transitionTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const pendingDissolveRef = useRef(false);
 
     useEffect(() => {
         currentLayerRef.current = currentLayer;
@@ -66,7 +68,6 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
         };
 
         const transition = meta.transition ?? "cut";
-        const duration = meta.transitionDuration ?? 0.5;
 
         if (transitionTimerRef.current) {
             clearTimeout(transitionTimerRef.current);
@@ -76,17 +77,32 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
         if (transition === "dissolve" && currentLayerRef.current) {
             setPrevLayer(currentLayerRef.current);
             setCurrentLayer(newLayer);
-            setTransitioning(true);
-            transitionTimerRef.current = setTimeout(() => {
-                setPrevLayer(null);
-                setTransitioning(false);
-            }, duration * 1000);
+            setLayerReady(false);
+            pendingDissolveRef.current = true;
+            setTransitioning(false);
         } else {
             setPrevLayer(null);
             setCurrentLayer(newLayer);
+            setLayerReady(false);
+            pendingDissolveRef.current = false;
             setTransitioning(false);
         }
     }, []);
+
+    const handleLayerReady = useCallback(() => {
+        setLayerReady(true);
+    }, []);
+
+    useEffect(() => {
+        if (!layerReady || !pendingDissolveRef.current) return;
+        pendingDissolveRef.current = false;
+        const duration = (currentLayerRef.current?.bundleMeta.transitionDuration ?? 0.5) * 1000;
+        setTransitioning(true);
+        transitionTimerRef.current = setTimeout(() => {
+            setPrevLayer(null);
+            setTransitioning(false);
+        }, duration);
+    }, [layerReady]);
 
     // Slide loading
     useEffect(() => {
@@ -246,7 +262,9 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                     className={`ds-transition-layer ${transitioning ? "ds-dissolve-in" : ""}`}
                     style={{
                         zIndex: 2,
-                        ...(transitioning ? { animationDuration: `${transitionDuration}s` } : {}),
+                        ...(transitioning
+                            ? { animationDuration: `${transitionDuration}s` }
+                            : prevLayer ? { opacity: 0 } : {}),
                     }}
                 >
                     <DisplaySlide
@@ -255,6 +273,7 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                         bundleMeta={currentLayer.bundleMeta}
                         activeEntry={currentLayer.activeEntry}
                         announcement={announcement}
+                        onReady={handleLayerReady}
                     />
                 </div>
             )}

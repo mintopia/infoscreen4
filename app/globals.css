@@ -295,6 +295,30 @@ canvas {
     width: 100% !important;
 }
 
+.toolbar-hex-input {
+    width: 100%;
+    box-sizing: border-box;
+    height: 30px;
+    padding: 4px 8px;
+    margin-top: 6px;
+    border: 1px solid var(--tb-border);
+    border-radius: 6px;
+    background: var(--tb-bg) !important;
+    color: var(--tb-text) !important;
+    font-size: 13px;
+    font-family: "SF Mono", "Cascadia Code", "Fira Code", monospace;
+    text-align: center;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    outline: none;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.2);
+}
+
+.toolbar-hex-input:focus {
+    border-color: var(--tb-accent-border);
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.2), 0 0 0 2px rgba(56, 189, 248, 0.2);
+}
+
 .toolbar-color-preset {
     width: 24px;
     height: 24px;
