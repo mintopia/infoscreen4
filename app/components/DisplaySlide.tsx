@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, useCallback } from "react";
 import Image from "next/image";
 import * as fabric from "fabric";
 import { BundleMeta, BundleSlideEntry } from "../interfaces/BundleMeta";
@@ -13,6 +13,7 @@ interface Props {
     autoScale?: boolean;      // overrides bundleMeta.autoScale (e.g. admin preview always scales)
     showMissingAssetWarning?: boolean;
     activeEntry?: BundleSlideEntry | null;
+    announcement?: string | null;
 }
 
 const DEFAULT_W = 1920;
@@ -23,7 +24,7 @@ function isVideo(name: string) {
     return VIDEO_EXTS.has(name.split(".").pop()?.toLowerCase() ?? "");
 }
 
-export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOverride, showMissingAssetWarning = false, activeEntry }: Props) {
+export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOverride, showMissingAssetWarning = false, activeEntry, announcement }: Props) {
     const containerRef = useRef<HTMLDivElement>(null);
     const canvasWrapRef = useRef<HTMLDivElement>(null);
     const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -111,6 +112,37 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
 
     const [hasMissingAssets, setHasMissingAssets] = useState(false);
     const [localTime, setLocalTime] = useState("");
+    const announcementRef = useRef<HTMLDivElement>(null);
+    const announcementInnerRef = useRef<HTMLSpanElement>(null);
+
+    const fitAnnouncementText = useCallback(() => {
+        const outer = announcementRef.current;
+        const inner = announcementInnerRef.current;
+        if (!outer || !inner) return;
+        inner.style.transform = "";
+        const style = getComputedStyle(outer);
+        const pad = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+        const available = outer.clientWidth - pad;
+        const natural = inner.scrollWidth;
+        if (natural > available && available > 0) {
+            inner.style.transform = `scale(${available / natural})`;
+        }
+        outer.style.visibility = "visible";
+    }, []);
+
+    useEffect(() => {
+        if (!announcement) return;
+        requestAnimationFrame(fitAnnouncementText);
+    }, [announcement, fitAnnouncementText]);
+
+    useEffect(() => {
+        if (!announcement) return;
+        const container = containerRef.current;
+        if (!container) return;
+        const ro = new ResizeObserver(fitAnnouncementText);
+        ro.observe(container);
+        return () => ro.disconnect();
+    }, [announcement, fitAnnouncementText]);
 
     useEffect(() => {
         if (!bundleMeta?.showLocalTime) return;
@@ -160,34 +192,74 @@ export default function DisplaySlide({ json, bundleMeta, autoScale: autoScaleOve
             className="slide-preview-container"
             style={!fileUrl && background ? { background } : undefined}
         >
-            {bundleMeta?.showLocalTime && (() => {
-                const pos = bundleMeta.localTimePosition || "bottom-right";
+            {(() => {
+                const showClock = bundleMeta?.showLocalTime;
+                const clockPos = bundleMeta?.localTimePosition || "bottom-right";
+                const clockAtTop = clockPos.includes("top");
+                const clockAtBottom = clockPos.includes("bottom");
+                const clockOnRight = clockPos.includes("right");
+
+                const pillStyle: React.CSSProperties = {
+                    padding: "4px 12px",
+                    backgroundColor: "rgba(0,0,0,0.5)",
+                    backdropFilter: "blur(4px)",
+                    color: "white",
+                    fontFamily: "Inter",
+                    fontSize: "min(3vw, 48px)",
+                    fontWeight: 900,
+                    letterSpacing: "1px",
+                    lineHeight: 1.2,
+                    borderRadius: "8px",
+                    pointerEvents: "none",
+                    textShadow: "2px 2px 2px black",
+                    boxShadow: "0 4px 6px rgba(0,0,0,0.9)",
+                    whiteSpace: "nowrap",
+                };
+
+                const showTopClock = showClock && clockAtTop;
+                const showBottomBar = announcement || (showClock && clockAtBottom);
+
                 return (
-                    <div
-                        style={{
-                            position: "absolute",
-                            margin: 0,
-                            top: pos.includes("top") ? "min(20px, 2%)" : "auto",
-                            bottom: pos.includes("bottom") ? "min(20px, 2%)" : "auto",
-                            left: pos.includes("left") ? "min(30px, 3%)" : "auto",
-                            right: pos.includes("right") ? "min(30px, 3%)" : "auto",
-                            zIndex: 10,
-                            padding: "4px 12px",
-                            backgroundColor: "rgba(0,0,0,0.5)",
-                            backdropFilter: "blur(4px)",
-                            color: "white",
-                            fontFamily: "Inter",
-                            fontSize: "min(3vw, 48px)",
-                            fontWeight: 900,
-                            letterSpacing: "1px",
-                            borderRadius: "8px",
-                            pointerEvents: "none",
-                            textShadow: "2px 2px 2px black",
-                            boxShadow: "0 4px 6px rgba(0,0,0,0.9)",
-                        }}
-                    >
-                        {localTime}
-                    </div>
+                    <>
+                        {showTopClock && (
+                            <div style={{
+                                position: "absolute",
+                                margin: 0,
+                                top: "min(20px, 2%)",
+                                left: clockOnRight ? "auto" : "min(30px, 3%)",
+                                right: clockOnRight ? "min(30px, 3%)" : "auto",
+                                zIndex: 10,
+                                ...pillStyle,
+                            }}>
+                                {localTime}
+                            </div>
+                        )}
+                        {showBottomBar && (
+                            <div style={{
+                                position: "absolute",
+                                bottom: "min(20px, 2%)",
+                                left: "min(30px, 3%)",
+                                right: "min(30px, 3%)",
+                                zIndex: 10,
+                                display: "flex",
+                                alignItems: "stretch",
+                                gap: "8px",
+                                pointerEvents: "none",
+                                flexDirection: (showClock && clockAtBottom && clockOnRight) ? "row" : "row-reverse",
+                            }}>
+                                {announcement && (
+                                    <div style={{ ...pillStyle, flex: 1, padding: "4px 24px", overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center", visibility: "hidden" }} ref={announcementRef}>
+                                        <span ref={announcementInnerRef} style={{ transformOrigin: "center", whiteSpace: "nowrap" }}>{announcement}</span>
+                                    </div>
+                                )}
+                                {showClock && clockAtBottom && (
+                                    <div style={{ ...pillStyle, flexShrink: 0 }}>
+                                        {localTime}
+                                    </div>
+                                )}
+                            </div>
+                        )}
+                    </>
                 );
             })()}
             <div ref={canvasWrapRef} className="ds-canvas-wrap" style={{ position: "relative" }}>

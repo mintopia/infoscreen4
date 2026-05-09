@@ -38,6 +38,7 @@ export interface ServerState {
     displayConnections: Record<string, number>;
     displayCycling: Record<string, boolean>;
     streams: StreamInfo[];
+    displayAnnouncements: Record<string, string>;
 }
 
 export function useSocket(role: SocketRole, displayId?: string) {
@@ -52,8 +53,10 @@ export function useSocket(role: SocketRole, displayId?: string) {
         displayConnections: {},
         displayCycling: {},
         streams: [],
+        displayAnnouncements: {},
     });
     const [bundleMetaUpdate, setBundleMetaUpdate] = useState<BundleMetaUpdate | null>(null);
+    const [announcement, setAnnouncement] = useState<string | null>(null);
 
     useEffect(() => {
         const socket = io({
@@ -91,6 +94,9 @@ export function useSocket(role: SocketRole, displayId?: string) {
         socket.on("streams:update", (streams: StreamInfo[]) =>
             setState((prev) => ({ ...prev, streams }))
         );
+        socket.on("announcement:update", (data: { text: string | null }) =>
+            setAnnouncement(data.text)
+        );
 
         return () => { socket.disconnect(); };
     }, [role, displayId]);
@@ -127,6 +133,14 @@ export function useSocket(role: SocketRole, displayId?: string) {
         socketRef.current?.emit("stream:clear", { displayId });
     };
 
+    const setAnnouncementText = (displayId: string, text: string) => {
+        socketRef.current?.emit("announcement:set", { displayId, text });
+    };
+
+    const clearAnnouncement = (displayId: string) => {
+        socketRef.current?.emit("announcement:clear", { displayId });
+    };
+
     return {
         connected,
         state,
@@ -139,6 +153,9 @@ export function useSocket(role: SocketRole, displayId?: string) {
         bundleMetaUpdate,
         showStream,
         clearStream,
+        setAnnouncementText,
+        clearAnnouncement,
+        announcement,
         socketRef,
     };
 }

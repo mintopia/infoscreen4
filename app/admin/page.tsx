@@ -6,7 +6,7 @@ import dynamic from "next/dynamic";
 import { useSocket, DisplayConfig } from "../hooks/useSocket";
 import {
     Monitor, MonitorOff, Pencil, StepBack, StepForward,
-    Play, Pause, RotateCcw, FolderPlus, RefreshCw, Settings, CircleOff, Zap, FilePlus, User, ChevronDown, Globe, Radio
+    Play, Pause, RotateCcw, FolderPlus, RefreshCw, Settings, CircleOff, Zap, FilePlus, User, ChevronDown, Globe, Radio, Bell, BellOff
 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { BundleMeta, BundleSlideEntry } from "../interfaces/BundleMeta";
@@ -53,7 +53,7 @@ export default function AdminDashboard() {
     const [currentUser, setCurrentUser] = useState<string | null>(null);
     const [userMenuOpen, setUserMenuOpen] = useState(false);
     const userMenuRef = useRef<HTMLDivElement | null>(null);
-    const { connected, state, showSlide, clearSlide, stopCycle, updateBundleMeta, activateBundle, updateDisplayConfig, bundleMetaUpdate, showStream, clearStream, socketRef } = useSocket("admin");
+    const { connected, state, showSlide, clearSlide, stopCycle, updateBundleMeta, activateBundle, updateDisplayConfig, bundleMetaUpdate, showStream, clearStream, setAnnouncementText, clearAnnouncement, socketRef } = useSocket("admin");
     const [bundles, setBundles] = useState<BundleInfo[]>([]);
     const [selectedDisplay, setSelectedDisplay] = useState<string | null>(null);
     const [displayDrafts, setDisplayDrafts] = useState<DisplayConfig[]>([]);
@@ -124,6 +124,8 @@ export default function AdminDashboard() {
     const [loadingPreview, setLoadingPreview] = useState(false);
     const [confirmActivateBundle, setConfirmActivateBundle] = useState<string | null>(null);
     const [displayActiveStreams, setDisplayActiveStreams] = useState<Record<string, string>>({});
+    const [announcementDraft, setAnnouncementDraft] = useState("");
+    const announcementSeeded = useRef(false);
     const bundleMetaRef = useRef<BundleMeta>({});
     const liveLoadSeqRef = useRef(0);
 
@@ -141,6 +143,19 @@ export default function AdminDashboard() {
     useEffect(() => {
         defer(() => setDisplayDrafts(state.displayConfigs));
     }, [state.displayConfigs]);
+
+    useEffect(() => {
+        if (!effectiveSelectedDisplay) return;
+        const serverText = state.displayAnnouncements[effectiveSelectedDisplay];
+        if (serverText && !announcementSeeded.current) {
+            setAnnouncementDraft(serverText);
+        }
+        announcementSeeded.current = true;
+    }, [effectiveSelectedDisplay, state.displayAnnouncements]);
+
+    useEffect(() => {
+        announcementSeeded.current = false;
+    }, [effectiveSelectedDisplay]);
 
     const selectedDisplayState = useMemo(
         () => effectiveSelectedDisplay ? state.displayStates?.[effectiveSelectedDisplay] ?? null : null,
@@ -1072,6 +1087,7 @@ export default function AdminDashboard() {
                                         }
                                         autoScale={true}
                                         showMissingAssetWarning={true}
+                                        announcement={effectiveSelectedDisplay ? state.displayAnnouncements[effectiveSelectedDisplay] ?? null : null}
                                     />
                                 </div>
 
@@ -1152,6 +1168,60 @@ export default function AdminDashboard() {
                         <button className="admin-foot-btn" onClick={() => loadBundles()} title="Reload bundles">
                             <RotateCcw size={15} />
                         </button>
+                        <div className="admin-footer-sep" />
+                        {(() => {
+                            const liveText = effectiveSelectedDisplay ? state.displayAnnouncements[effectiveSelectedDisplay] ?? "" : "";
+                            const announcementActive = !!liveText;
+                            const draftDirty = announcementActive && announcementDraft.trim() !== liveText;
+                            return (
+                                <div className="admin-announcement-bar">
+                                    <input
+                                        type="text"
+                                        className={`admin-announcement-input${draftDirty ? " admin-announcement-dirty" : ""}`}
+                                        placeholder="Announcement text..."
+                                        value={announcementDraft}
+                                        onChange={(e) => setAnnouncementDraft(e.target.value)}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && effectiveSelectedDisplay) {
+                                                if (announcementDraft.trim()) {
+                                                    setAnnouncementText(effectiveSelectedDisplay, announcementDraft.trim());
+                                                } else if (announcementActive) {
+                                                    clearAnnouncement(effectiveSelectedDisplay);
+                                                }
+                                            }
+                                        }}
+                                    />
+                                    {draftDirty && (
+                                        <button
+                                            className="admin-foot-btn"
+                                            onClick={() => {
+                                                if (!effectiveSelectedDisplay || !announcementDraft.trim()) return;
+                                                setAnnouncementText(effectiveSelectedDisplay, announcementDraft.trim());
+                                            }}
+                                            disabled={!connected || !announcementDraft.trim()}
+                                            title="Update announcement"
+                                        >
+                                            <RefreshCw size={14} />
+                                        </button>
+                                    )}
+                                    <button
+                                        className={`admin-foot-btn${announcementActive ? " admin-foot-active" : ""}`}
+                                        onClick={() => {
+                                            if (!effectiveSelectedDisplay) return;
+                                            if (announcementActive) {
+                                                clearAnnouncement(effectiveSelectedDisplay);
+                                            } else if (announcementDraft.trim()) {
+                                                setAnnouncementText(effectiveSelectedDisplay, announcementDraft.trim());
+                                            }
+                                        }}
+                                        disabled={!connected || !effectiveSelectedDisplay || (!announcementDraft.trim() && !announcementActive)}
+                                        title={announcementActive ? "Clear announcement" : "Show announcement"}
+                                    >
+                                        {announcementActive ? <BellOff size={14} /> : <Bell size={14} />}
+                                    </button>
+                                </div>
+                            );
+                        })()}
                     </div>
                 </footer>
 

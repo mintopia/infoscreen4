@@ -1500,7 +1500,7 @@ canvas {
 }
 
 .ds-dissolve-in {
-    animation: ds-dissolve-keyframes ease-in-out forwards;
+    animation: ds-dissolve-keyframes ease-in-out both;
 }
 
 @keyframes ds-dissolve-keyframes {
@@ -1662,6 +1662,16 @@ canvas {
 
 .admin-foot-btn.admin-foot-danger:hover:not(:disabled) {
     background: var(--tb-danger);
+}
+
+.admin-foot-btn.admin-foot-active {
+    background: #2e7d32;
+    border-color: #388e3c;
+    color: #fff;
+}
+
+.admin-foot-btn.admin-foot-active:hover:not(:disabled) {
+    background: #388e3c;
 }
 
 /* ── Bundle settings panel ──────────────── */
@@ -2200,6 +2210,43 @@ canvas {
 .display-root .slide-preview-container {
     width: 100%;
     height: 100%;
+}
+
+/* ── Announcement bar (admin footer) ───── */
+.admin-announcement-bar {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.admin-announcement-icon {
+    color: var(--tb-text-muted);
+    flex-shrink: 0;
+}
+
+.admin-announcement-input {
+    height: 30px;
+    width: 220px;
+    padding: 0 8px;
+    border-radius: 4px;
+    border: 1px solid var(--tb-border);
+    background: var(--tb-surface-low);
+    color: var(--tb-text);
+    font-size: 12px;
+    outline: none;
+    transition: border-color 0.15s;
+}
+
+.admin-announcement-input:focus {
+    border-color: var(--tb-accent-border);
+}
+
+.admin-announcement-input::placeholder {
+    color: var(--tb-text-disabled);
+}
+
+.admin-announcement-input.admin-announcement-dirty {
+    border-color: #f59e0b;
 }
 
 .editor-scrollbar-horizontal {

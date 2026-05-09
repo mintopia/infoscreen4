@@ -30,6 +30,7 @@ interface ServerState {
     displayConnections: Record<string, number>;
     displayCycling: Record<string, boolean>;
     streams: StreamInfo[];
+    displayAnnouncements: Record<string, string>;
 }
 
 interface CycleSlide {
@@ -58,6 +59,9 @@ const socketToStream = new Map<string, string>();       // socketId → streamId
 const displayActiveStream = new Map<string, string>();  // displayId → streamId
 const socketToWatchedStream = new Map<string, string>(); // viewerSocketId → streamId
 
+// Announcement state
+const displayAnnouncements = new Map<string, string>();  // displayId → announcement text
+
 function emitAdminStreams() {
     if (!io) return;
     io.to("admins").emit("streams:update", [...streams.values()]);
@@ -75,6 +79,7 @@ function getServerState(): ServerState {
             Object.entries(displayCycleTimers).map(([displayId, timer]) => [displayId, timer !== null])
         ),
         streams: [...streams.values()],
+        displayAnnouncements: Object.fromEntries(displayAnnouncements),
     };
 }
 
@@ -260,6 +265,11 @@ app.prepare().then(() => {
                 socket.emit("slide:show", enrichSlideData(displayStates[displayId]!));
             }
 
+            const currentAnnouncement = displayAnnouncements.get(displayId);
+            if (currentAnnouncement) {
+                socket.emit("announcement:update", { text: currentAnnouncement });
+            }
+
             const activeStreamId = displayActiveStream.get(displayId);
             if (activeStreamId) {
                 const stream = streams.get(activeStreamId);
@@ -435,6 +445,25 @@ app.prepare().then(() => {
                 const targetId = ensureDisplayId(data.displayId);
                 displayActiveStream.delete(targetId);
                 io?.to(displayRoom(targetId)).emit("stream:cleared");
+            });
+
+            socket.on("announcement:set", (data: { displayId: string; text: string }) => {
+                const targetId = ensureDisplayId(data.displayId);
+                const text = (data.text ?? "").trim();
+                if (text) {
+                    displayAnnouncements.set(targetId, text);
+                } else {
+                    displayAnnouncements.delete(targetId);
+                }
+                io?.to(displayRoom(targetId)).emit("announcement:update", { text: text || null });
+                emitAdminState();
+            });
+
+            socket.on("announcement:clear", (data: { displayId: string }) => {
+                const targetId = ensureDisplayId(data.displayId);
+                displayAnnouncements.delete(targetId);
+                io?.to(displayRoom(targetId)).emit("announcement:update", { text: null });
+                emitAdminState();
             });
         }
 

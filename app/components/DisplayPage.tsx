@@ -30,7 +30,7 @@ interface DisplayPageProps {
 
 export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
     const defer = (fn: () => void) => queueMicrotask(fn);
-    const { state, bundleMetaUpdate, socketRef, connected } = useSocket("display", displayId);
+    const { state, bundleMetaUpdate, socketRef, connected, announcement } = useSocket("display", displayId);
     const [displayJson, setDisplayJson] = useState<object | null>(null);
     const [bundleMeta, setBundleMeta] = useState<BundleMeta>({});
     const loadSeqRef = useRef(0);
@@ -237,6 +237,7 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                         json={prevLayer.json}
                         bundleMeta={prevLayer.bundleMeta}
                         activeEntry={prevLayer.activeEntry}
+                        announcement={announcement}
                     />
                 </div>
             )}
@@ -253,6 +254,7 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                         json={currentLayer.json}
                         bundleMeta={currentLayer.bundleMeta}
                         activeEntry={currentLayer.activeEntry}
+                        announcement={announcement}
                     />
                 </div>
             )}
@@ -261,6 +263,7 @@ export default function DisplayPage({ displayId = "1" }: DisplayPageProps) {
                     json={displayJson}
                     bundleMeta={bundleMeta}
                     activeEntry={bundleMeta.slides?.find(s => s.id === state.activeSlide?.slide) ?? null}
+                    announcement={announcement}
                 />
             )}
             {activeStream && (
