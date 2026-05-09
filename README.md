@@ -19,7 +19,105 @@ The project is built with Next.js, React, Socket.IO, and Fabric.js, with a light
 - Optional HTTPS support for secure media capture workflows.
 - No external database required for local/self-hosted usage.
 
-## 3. Setup Guide For Production
+## 3. Setup Guide For Production (Docker)
+
+Infoscreen4 can be run in a Docker container for convenient deployment.
+
+### Quick Start
+
+```bash
+docker run -d \
+  --name infoscreen4 \
+  -p 3000:3000 \
+  -v /path/to/data:/app/data \
+  --restart unless-stopped \
+  ghcr.io/reaby/infoscreen4:latest
+```
+
+Or with Docker Compose:
+
+```yaml
+services:
+  infoscreen:
+    image: infoscreen4
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+```
+
+### Data Directory
+
+All persistent data (bundles, slides, media, user accounts) is stored in `/app/data`. On first start, if the mounted directory is empty, the container automatically seeds it with default content including example slides and backgrounds.
+
+### User Accounts
+
+On first start, the container generates random passwords for the default `admin` and `user` accounts and prints them to the container log:
+
+```
+========================================
+  Generated login credentials
+========================================
+  Admin:    admin / aB3kM9xP2nLq
+  Streamer: user  / wR7jN4vD6mYs
+========================================
+  Change these in the admin UI or by
+  editing data/users.json
+========================================
+```
+
+View credentials with `docker logs infoscreen4`. Passwords are only generated once — on subsequent starts the existing `users.json` is preserved.
+
+### Environment Variables
+
+| Variable | Default | Description |
+|---|---|---|
+| `PUID` | `1000` | User ID the app runs as |
+| `PGID` | `1000` | Group ID the app runs as |
+| `PORT` | `3000` | Server listen port |
+| `HOST` | `0.0.0.0` | Server bind address |
+| `GENERATE_SELFSIGNED_CERT` | `false` | Generate a self-signed TLS certificate on startup |
+
+### HTTPS / TLS
+
+For production, the recommended approach is to run Infoscreen4 behind a reverse proxy that handles TLS. [Caddy](https://caddyserver.com/) provides automatic HTTPS with no configuration:
+
+```yaml
+services:
+  infoscreen:
+    image: ghcr.io/reaby/infoscreen4:latest
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+    restart: unless-stopped
+
+volumes:
+  caddy_data:
+```
+
+With a `Caddyfile`:
+
+```
+infoscreen.example.com {
+    reverse_proxy infoscreen:3000
+}
+```
+
+Caddy automatically obtains and renews TLS certificates from Let's Encrypt. Replace `infoscreen.example.com` with your domain.
+
+For local/LAN use without a domain, you can set `GENERATE_SELFSIGNED_CERT=true` to have the container generate a self-signed certificate. The cert is stored in the data directory and reused across restarts.
+
+## 4. Setup Guide For Production (Manual)
 
 ### Prerequisites
 
@@ -64,7 +162,7 @@ pm2 start "pnpm run start" --name infoscreen4 --cwd /path/to/infoscreen4 --updat
 pm2 save
 ```
 
-## 4. Contributing
+## 5. Contributing
 
 Contributions are welcome.
 
@@ -72,7 +170,7 @@ If you want to improve Infoscreen4, feel free to open an issue to discuss ideas,
 
 Please keep changes aligned with the existing coding style and include relevant updates to docs when behavior changes.
 
-## 5. Setup Guide For Development
+## 6. Setup Guide For Development
 
 ### Prerequisites
 
@@ -106,7 +204,7 @@ Helpful routes:
 - Runtime data is stored under `data/`.
 - For camera/screen capture in browser testing, use `localhost` or HTTPS.
 
-## 6. Thanks
+## 7. Thanks
 
 Big thanks to the AI tools that helped accelerate this project:
 
