@@ -25,6 +25,14 @@ const DEFAULT_DURATION = 10;
 
 const normalizeSlideFile = (value: string) => (value.endsWith(".json") ? value : `${value}.json`);
 
+function normalizeUrl(raw: string): string {
+    const trimmed = raw.trim();
+    if (/^https?:\/\//i.test(trimmed)) return trimmed;
+    if (trimmed.startsWith("//")) return `https:${trimmed}`;
+    if (trimmed.startsWith("/")) return `https:/${trimmed}`;
+    return `https://${trimmed}`;
+}
+
 export default function AdminDashboard() {
     const defer = (fn: () => void) => queueMicrotask(fn);
     const router = useRouter();
@@ -472,7 +480,7 @@ export default function AdminDashboard() {
         if (isWeb) {
             const res = await askPrompt("Edit Website URL:", entry?.data);
             if (res === null) return;
-            newName = res.trim();
+            newName = normalizeUrl(res);
         } else {
             const res = await askPrompt("Rename slide file to:", name);
             if (res === null) return;
@@ -667,6 +675,7 @@ export default function AdminDashboard() {
                                     {dialog.type === 'prompt' && (
                                         <input
                                             type="text"
+                                            autoComplete="off"
                                             defaultValue={dialog.defaultVal}
                                             style={{ width: "100%", padding: "6px", marginBottom: "10px", background: "#3a3a3a", color: "white", border: "1px solid #555" }}
                                             onKeyDown={(e) => {
@@ -777,8 +786,9 @@ export default function AdminDashboard() {
                                     className="admin-icon-btn"
                                     onClick={async () => {
                                         if (!selectedBundle) return;
-                                        const url = await askPrompt("Website URL (e.g. https://example.com):");
-                                        if (!url) return;
+                                        const urlRaw = await askPrompt("Website URL (e.g. https://example.com):");
+                                        if (!urlRaw) return;
+                                        const url = normalizeUrl(urlRaw);
                                         const titleStr = await askPrompt("Slide title (optional):");
                                         const title = titleStr ? titleStr.trim() : "";
                                         const nextSlides = [...(bundleMeta?.slides || []), {
